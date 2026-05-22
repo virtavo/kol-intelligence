@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>KIP</title>
+  <script>
+    // GitHub Pages SPA redirect trick
+    var path = window.location.pathname;
+    var search = window.location.search;
+    var hash = window.location.hash;
+    var qs = '?p=' + encodeURIComponent(path.slice(1)) +
+             (search ? '&q=' + encodeURIComponent(search.slice(1)) : '') +
+             (hash   ? '&h=' + encodeURIComponent(hash.slice(1))   : '');
+    window.location.replace('/' + qs);
+  </script>
+</head>
+<body></body>
+</html>
