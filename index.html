@@ -235,7 +235,23 @@
       }
       .stat-label { font-size: 12px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 4px; }
     </style>
-  </head>
+    <script>
+    // Receive redirect from 404.html
+    (function(){
+      var qs = window.location.search;
+      if (qs) {
+        var params = {};
+        qs.slice(1).split('&').forEach(function(p){ var kv=p.split('='); params[kv[0]]=decodeURIComponent(kv[1]||''); });
+        if (params.p !== undefined) {
+          var url = '/' + params.p +
+                    (params.q ? '?' + params.q : '') +
+                    (params.h ? '#' + params.h : '');
+          window.history.replaceState(null, null, url);
+        }
+      }
+    })();
+  </script>
+</head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
