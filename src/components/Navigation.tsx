@@ -47,15 +47,11 @@ export default function Navigation() {
       {/* Logo */}
       <div style={{ padding: collapsed ? '0 0 20px' : '0 20px 20px', borderBottom: '1px solid rgba(139,92,246,0.1)', marginBottom: 8, display:'flex', alignItems:'center', justifyContent: collapsed ? 'center' : 'space-between' }}>
         {!collapsed && (
-          <div>
-            <div style={{
-              fontSize: 15, fontWeight: 900, letterSpacing: '-0.03em',
-              background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #38bdf8 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text', lineHeight: 1.1,
-            }}>KIP</div>
-            <div style={{ fontSize: 9.5, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.12em', marginTop: 2 }}>Intelligence</div>
-          </div>
+          <img
+            src="/logo.png"
+            alt="KIP"
+            style={{ height: 32, width: 'auto', objectFit: 'contain' }}
+          />
         )}
         <button onClick={() => setCollapsed(c => !c)} style={{
           width: 28, height: 28, borderRadius: 8, border: '1px solid rgba(139,92,246,0.15)',
