@@ -9,13 +9,22 @@ const CF:Record<string,string>={US:'🇺🇸',GB:'🇬🇧',DE:'🇩🇪',CA:'�
 declare global{interface Window{_kolProgress:string[];_kolDone:boolean;}}
 async function getIDs(kw:string,code:string,apiKey:string,pages=3):Promise<string[]>{
   const ids:string[]=[]; let pt='';
+  const since=new Date(); since.setDate(since.getDate()-30);
+  const publishedAfter=since.toISOString();
   for(let p=0;p<pages;p++){
     const u=new URL('https://www.googleapis.com/youtube/v3/search');
-    ['part','snippet','type','channel','maxResults','50','q',kw,'regionCode',code,'relevanceLanguage',code==='DE'?'de':'en','key',apiKey].reduce((acc,v,i,arr)=>{if(i%2===0)u.searchParams.set(v,arr[i+1]);return acc;},null);
+    u.searchParams.set('part','snippet');
+    u.searchParams.set('type','video');
+    u.searchParams.set('maxResults','50');
+    u.searchParams.set('q',kw);
+    u.searchParams.set('regionCode',code);
+    u.searchParams.set('relevanceLanguage',code==='DE'?'de':'en');
+    u.searchParams.set('publishedAfter',publishedAfter);
+    u.searchParams.set('key',apiKey);
     if(pt)u.searchParams.set('pageToken',pt);
     const d=await(await fetch(u.toString())).json();
     if(d.error){console.warn(d.error.message);break;}
-    ids.push(...(d.items||[]).map((i:any)=>i.id?.channelId).filter(Boolean));
+    ids.push(...(d.items||[]).map((i:any)=>i.snippet?.channelId).filter(Boolean));
     pt=d.nextPageToken||''; if(!pt)break;
     await new Promise(r=>setTimeout(r,200));
   }
@@ -36,7 +45,9 @@ function getEmail(ch:any):string|null{
 }
 function toKOL(ch:any,code:string,kw:string):any{
   const sub=parseInt(ch.statistics?.subscriberCount||'0'),vid=parseInt(ch.statistics?.videoCount||'1'),view=parseInt(ch.statistics?.viewCount||'0'),avg=Math.round(view/Math.max(vid,1));
-  return{channelId:ch.id,title:ch.snippet?.title||'',description:(ch.snippet?.description||'').slice(0,300),thumbnailUrl:ch.snippet?.thumbnails?.default?.url||'',channelUrl:`https://www.youtube.com/channel/${ch.id}`,country:CN[code]||code,countryCode:code,subscriberCount:sub,videoCount:vid,viewCount:view,avgViewsPerVideo:avg,engagementRate:sub>0?Math.round(avg/sub*1000)/10:0,uploadFrequencyPerMonth:Math.round(vid/36*10)/10,businessEmail:getEmail(ch),keyword:kw,status:'new',notes:'',crawledAt:new Date().toISOString(),isActive:sub>1000&&vid>5};
+  const realCode=ch.snippet?.country||code;
+  const ALL_CN:Record<string,string>={US:'United States',GB:'United Kingdom',DE:'Germany',CA:'Canada',AU:'Australia',IN:'India',FR:'France',AT:'Austria',CH:'Switzerland',JP:'Japan',KR:'South Korea',BR:'Brazil',MX:'Mexico',ES:'Spain',IT:'Italy',NL:'Netherlands',PL:'Poland',SE:'Sweden',NO:'Norway',DK:'Denmark',FI:'Finland',TR:'Turkey',RU:'Russia',ZA:'South Africa',NG:'Nigeria',EG:'Egypt',ID:'Indonesia',PH:'Philippines',TH:'Thailand',VN:'Vietnam',MY:'Malaysia',SG:'Singapore',HK:'Hong Kong',TW:'Taiwan',AR:'Argentina',NZ:'New Zealand',IE:'Ireland',PT:'Portugal',UA:'Ukraine',IL:'Israel',SA:'Saudi Arabia',AE:'United Arab Emirates'};
+  return{channelId:ch.id,title:ch.snippet?.title||'',description:(ch.snippet?.description||'').slice(0,300),thumbnailUrl:ch.snippet?.thumbnails?.default?.url||'',channelUrl:`https://www.youtube.com/channel/${ch.id}`,country:ALL_CN[realCode]||realCode,countryCode:code,channelCountryCode:realCode,subscriberCount:sub,videoCount:vid,viewCount:view,avgViewsPerVideo:avg,engagementRate:sub>0?Math.round(avg/sub*1000)/10:0,uploadFrequencyPerMonth:Math.round(vid/36*10)/10,businessEmail:getEmail(ch),keyword:kw,status:'new',notes:'',crawledAt:new Date().toISOString(),isActive:sub>1000&&vid>5};
 }
 async function crawlCountry(code:string,apiKey:string,log:(m:string)=>void){
   const kws=KW[code]||[],seen=new Set<string>(),allIds:string[]=[];
@@ -48,7 +59,7 @@ async function crawlCountry(code:string,apiKey:string,log:(m:string)=>void){
   }
   log(`📥 获取 ${allIds.length} 个频道详情...`);
   const raw=await getDetails(allIds,apiKey);
-  const kols=raw.map(ch=>toKOL(ch,code,'')).filter(k=>k.subscriberCount>=500&&k.videoCount>=3);
+  const kols=raw.map(ch=>toKOL(ch,code,'')).filter(k=>k.subscriberCount>=500&&k.subscriberCount<100000&&k.videoCount>=3&&k.businessEmail!==null);
   log(`✅ ${code}：${kols.length} 个，邮箱 ${kols.filter((k:any)=>k.businessEmail).length} 个`);
   return kols;
 }
