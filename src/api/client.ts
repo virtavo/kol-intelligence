@@ -59,7 +59,9 @@ async function crawlCountry(code:string,apiKey:string,log:(m:string)=>void){
   }
   log(`📥 获取 ${allIds.length} 个频道详情...`);
   const raw=await getDetails(allIds,apiKey);
-  const kols=raw.map(ch=>toKOL(ch,code,'')).filter(k=>k.subscriberCount>=500&&k.subscriberCount<100000&&k.videoCount>=3&&k.businessEmail!==null);
+  // 国家过滤：ch.snippet?.country 明确设置且不匹配搜索区域的直接排除
+  const regionFiltered=raw.filter(ch=>{const c=ch.snippet?.country;return !c||c===code;});
+  const kols=regionFiltered.map(ch=>toKOL(ch,code,'')).filter(k=>k.subscriberCount>=500&&k.subscriberCount<100000&&k.videoCount>=3&&k.businessEmail!==null);
   log(`✅ ${code}：${kols.length} 个，邮箱 ${kols.filter((k:any)=>k.businessEmail).length} 个`);
   return kols;
 }
