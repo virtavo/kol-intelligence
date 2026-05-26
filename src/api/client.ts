@@ -108,6 +108,17 @@ const client={
     if(url==='/admin/users')return{data:{users:(await sb.get('/users?select=id,email,role,is_active,created_at&order=created_at.desc')).data}};
     if(url==='/admin/audit-log')return{data:{logs:(await sb.get('/audit_log?select=*&order=occurred_at.desc&limit=100')).data}};
     if(url==='/market/dashboard'){const all=(await sb.get('/projects?select=status,category_canonical,funded_amount_usd&limit=1000')).data;const m:any={};all.forEach((p:any)=>{const c=p.category_canonical||'other';if(!m[c])m[c]={category:c,count:0,totalFunding:0,successCount:0};m[c].count++;m[c].totalFunding+=(p.funded_amount_usd||0);if(p.status==='successful')m[c].successCount++;});return{data:{totalProjects:all.length,liveProjects:all.filter((p:any)=>p.status==='live').length,successfulProjects:all.filter((p:any)=>p.status==='successful').length,avgFundingUsd:all.length?Math.round(all.reduce((s:number,p:any)=>s+(p.funded_amount_usd||0),0)/all.length):0,byCategory:Object.values(m).map((c:any)=>({...c,avgFunding:c.count?Math.round(c.totalFunding/c.count):0,successRate:c.count?Math.round(c.successCount/c.count*100)/100:0}))}};}
+    if(url==='/kol/snapvital/status'){
+      const r=await sb.get('/ai_outputs?output_type=eq.kol_snapvital&limit=1');
+      if(!r.data.length)return{data:{total:0,withEmail:0,lastCrawledAt:null,nextCrawlIn:0}};
+      const chs=JSON.parse(r.data[0].content||'[]');
+      return{data:{total:chs.length,withEmail:chs.filter((c:any)=>c.businessEmail).length,lastCrawledAt:r.data[0].generated_at,nextCrawlIn:0}};
+    }
+    if(url==='/kol/snapvital/data'){
+      const r=await sb.get('/ai_outputs?output_type=eq.kol_snapvital&limit=1');
+      if(!r.data.length)return{data:{channels:[]}};
+      try{return{data:{channels:JSON.parse(r.data[0].content||'[]')}};}catch{return{data:{channels:[]}};}
+    }
     if(url==='/health')return{data:{status:'ok',db:'supabase',timestamp:new Date().toISOString()}};
     if(url.startsWith('/mailchimp'))return{data:{connected:false,campaigns:[],templates:[],history:[],automations:[]}};
     if(url.startsWith('/crawl')||url.startsWith('/apollo'))return{data:{status:'idle',log:[]}};
@@ -137,6 +148,41 @@ const client={
       const ids=(sd.items||[]).map((i:any)=>i.id?.channelId).filter(Boolean);
       if(!ids.length)return{data:{channels:[]}};
       return{data:{channels:(await getDetails(ids,apiKey)).map(ch=>toKOL(ch,ch.snippet?.country||'US',keyword))}};
+    }
+    if(url==='/kol/snapvital/search'){
+      const{apiKey}=data;
+      const SV_KWS=['blood pressure monitor review','blood pressure cuff test','home blood pressure monitor','health gadget review','senior health tech','medical device review','heart health monitor','blood pressure management','hypertension tips','health monitoring wearable','health tech review','elderly care health tech','home health care device','wellness gadgets review','heart health tips','nurse health advice','chronic illness health','blood pressure accuracy test','omron blood pressure review','withings health monitor'];
+      const SV_CATS:Record<string,string>={'blood pressure monitor':'Blood Pressure','blood pressure cuff':'Blood Pressure','blood pressure':'Blood Pressure','health gadget':'Health Tech','health tech':'Health Tech','medical device':'Medical','wearable':'Health Tech','senior health':'Senior Health','elderly':'Senior Health','nurse':'Medical','doctor':'Medical','heart health':'Blood Pressure','hypertension':'Blood Pressure','omron':'Blood Pressure','withings':'Health Tech'};
+      const seen=new Set<string>();const allIds:string[]=[];const kwMap:Record<string,string>={};
+      for(const kw of SV_KWS){
+        try{const ids=(await getIDs(kw,'US',apiKey,2)).filter((id:string)=>!seen.has(id));ids.forEach((id:string)=>{seen.add(id);if(!kwMap[id])kwMap[id]=kw;});allIds.push(...ids);}
+        catch(e:any){console.warn('SV kw err:',e.message);}
+        await new Promise(res=>setTimeout(res,200));
+      }
+      const raw=await getDetails(allIds,apiKey);
+      const channels=raw
+        .filter((ch:any)=>{const c=ch.snippet?.country;return !c||c==='US';})
+        .map((ch:any)=>{
+          const kol=toKOL(ch,'US',kwMap[ch.id]||'');
+          const kw=(kwMap[ch.id]||'').toLowerCase();
+          let cat='Health & Wellness';
+          for(const[k,v] of Object.entries(SV_CATS)){if(kw.includes(k)){cat=v as string;break;}}
+          return{...kol,category:cat,matchedKeyword:kwMap[ch.id]||''};
+        })
+        .filter((k:any)=>k.subscriberCount>=1000&&k.subscriberCount<500000&&k.businessEmail!==null);
+      const ex=await sb.get('/ai_outputs?output_type=eq.kol_snapvital&limit=1');
+      let old:any[]=[];try{if(ex.data.length)old=JSON.parse(ex.data[0].content||'[]');}catch{}
+      const map=new Map(old.map((c:any)=>[c.channelId,c]));
+      let added=0;
+      for(const ch of channels){
+        if(!map.has(ch.channelId)){map.set(ch.channelId,ch);added++;}
+        else{const o=map.get(ch.channelId)!;map.set(ch.channelId,{...ch,status:o.status||'new',notes:o.notes||'',starred:o.starred??false});}
+      }
+      const merged=Array.from(map.values());
+      const payload={output_type:'kol_snapvital',entity_id:'snapvital',content:JSON.stringify(merged),generated_at:new Date().toISOString(),model_version:'sv-v1'};
+      if(ex.data.length)await sb.patch('/ai_outputs?output_type=eq.kol_snapvital',payload);
+      else await sb.post('/ai_outputs',payload);
+      return{data:{total:merged.length,withEmail:merged.filter((c:any)=>c.businessEmail).length,newThisCrawl:added,channels:merged}};
     }
     if(url==='/projects/search'){const{keyword,category,status}=data;let q='/projects?select=*&order=funded_amount_usd.desc&limit=50';if(category)q+=`&category_canonical=eq.${category}`;if(status)q+=`&status=eq.${status}`;if(keyword)q+=`&or=(title.ilike.*${keyword}*,description.ilike.*${keyword}*)`;const r=await sb.get(q);return{data:{projects:r.data,total:r.data.length}};}
     if(url==='/backers/overlap')return{data:{count:0,backers:[]}};
