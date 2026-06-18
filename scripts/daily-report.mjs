@@ -11,7 +11,9 @@ async function getKols(outputType, entityId) {
   const res = await fetch(url, { headers: H });
   const data = await res.json();
   if (!Array.isArray(data) || !data[0]) return [];
-  return Array.isArray(data[0].content) ? data[0].content : [];
+  let c = data[0].content;
+  if (typeof c === 'string') { try { c = JSON.parse(c); } catch { return []; } }
+  return Array.isArray(c) ? c : [];
 }
 
 async function saveReport(date, report) {
