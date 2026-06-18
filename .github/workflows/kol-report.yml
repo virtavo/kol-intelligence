@@ -1,0 +1,26 @@
+name: Daily KOL Report
+
+on:
+  schedule:
+    - cron: '30 2 * * *'   # UTC 02:30 (北京 10:30)，爬虫结束后运行
+  workflow_dispatch:        # 允许手动触发
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate daily KOL report
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SK:  ${{ secrets.SUPABASE_SK }}
+        run: node scripts/daily-report.mjs
