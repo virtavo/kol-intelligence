@@ -33,7 +33,7 @@ async function getIDs(kw:string,code:string,apiKey:string,pages=3):Promise<strin
 async function getDetails(ids:string[],apiKey:string):Promise<any[]>{
   const res:any[]=[];
   for(let i=0;i<ids.length;i+=50){
-    const d=await(await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,brandingSettings&id=${ids.slice(i,i+50).join(',')}&key=${encodeURIComponent(apiKey)}`)).json();
+    const d=await(await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,brandingSettings,topicDetails&id=${ids.slice(i,i+50).join(',')}&key=${encodeURIComponent(apiKey)}`)).json();
     if(!d.error)res.push(...(d.items||[]));
     await new Promise(r=>setTimeout(r,200));
   }
