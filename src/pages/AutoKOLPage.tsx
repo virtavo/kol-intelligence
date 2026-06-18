@@ -1,14 +1,50 @@
 import React,{useState,useEffect,useMemo,useRef}from'react';
 import client from'../api/client';
-interface Ch{channelId:string;title:string;description:string;subscriberCount:number;videoCount:number;avgViewsPerVideo:number;engagementRate:number;thumbnailUrl:string;channelUrl:string;businessEmail:string|null;country:string;countryCode:string;status:string;notes:string;crawledAt:string;keyword:string;updatedAt?:string;}
+interface Ch{channelId:string;title:string;description:string;subscriberCount:number;videoCount:number;avgViewsPerVideo:number;engagementRate:number;thumbnailUrl:string;channelUrl:string;businessEmail:string|null;country:string;countryCode:string;channelCountryCode?:string;status:string;notes:string;crawledAt:string;keyword:string;updatedAt?:string;topics?:string[];channelKeywords?:string[];defaultLanguage?:string;}
 const SC:Record<string,{bg:string;color:string;label:string;icon:string}>={new:{bg:'#eff6ff',color:'#1d4ed8',label:'New',icon:'🆕'},starred:{bg:'#fffbeb',color:'#b45309',label:'Starred',icon:'⭐'},contacted:{bg:'#fef9c3',color:'#854d0e',label:'Contacted',icon:'📧'},replied:{bg:'#f0fdf4',color:'#15803d',label:'Replied',icon:'💬'},partnered:{bg:'#faf5ff',color:'#7e22ce',label:'Partnered',icon:'🤝'},rejected:{bg:'#fef2f2',color:'#b91c1c',label:'Rejected',icon:'❌'}};
 const CTRY=[{code:'US',flag:'🇺🇸',label:'USA'},{code:'GB',flag:'🇬🇧',label:'UK'},{code:'DE',flag:'🇩🇪',label:'Germany'},{code:'CA',flag:'🇨🇦',label:'Canada'}];
 const FR=[{l:'All',min:0,max:Infinity},{l:'1K–10K',min:1000,max:10000},{l:'10K–50K',min:10000,max:50000},{l:'50K–100K',min:50000,max:100000},{l:'100K–500K',min:100000,max:500000},{l:'500K+',min:500000,max:Infinity}];
 const ER=[{l:'All',min:0,max:Infinity},{l:'<1%',min:0,max:1},{l:'1–3%',min:1,max:3},{l:'3–5%',min:3,max:5},{l:'5%+',min:5,max:Infinity}];
 const CF:Record<string,string>={US:'🇺🇸',GB:'🇬🇧',DE:'🇩🇪',CA:'🇨🇦',AU:'🇦🇺',IN:'🇮🇳',AT:'🇦🇹',CH:'🇨🇭',Other:'🌍'};
-function est(kw:string,code:string){const k=(kw||'').toLowerCase();let m=52;if(/tech|gadget|security|camera|drone|iot|wifi/.test(k))m=68;if(/beauty|fashion|makeup/.test(k))m=18;if(/home|furniture|kitchen|baby/.test(k))m=35;if(/kickstarter|crowdfunding/.test(k))m=62;const ak=/tech|gadget|drone|camera/.test(k)?[5,30,35,18,8,4]:/home|furniture|kitchen/.test(k)?[2,10,27,32,19,10]:/beauty|fashion/.test(k)?[10,38,28,14,7,3]:[5,20,30,25,13,7];const age=[{l:'13–17',p:ak[0]},{l:'18–24',p:ak[1]},{l:'25–34',p:ak[2]},{l:'35–44',p:ak[3]},{l:'45–54',p:ak[4]},{l:'55+',p:ak[5]}];let inc=/tech|kickstarter/.test(k)?[{l:'低',p:8},{l:'中',p:33},{l:'中高',p:38},{l:'高',p:21}]:/budget|cheap/.test(k)?[{l:'低',p:38},{l:'中',p:42},{l:'中高',p:14},{l:'高',p:6}]:[{l:'低',p:22},{l:'中',p:42},{l:'中高',p:25},{l:'高',p:11}];const cm:Record<string,Record<string,number>>={US:{US:45,IN:10,GB:10,CA:8,AU:7,Other:20},GB:{GB:42,US:20,AU:8,CA:6,IN:8,Other:16},DE:{DE:42,AT:12,CH:10,US:9,Other:27},CA:{CA:42,US:25,GB:8,AU:5,Other:20}};const countries=Object.entries(cm[code]||{[code]:45,Other:55}).map(([c,p])=>({flag:CF[c]||'🌍',name:c,pct:p as number})).sort((a,b)=>b.pct-a.pct);return{m,f:100-m,age,inc,countries};}
-function Bar({pct,color,label}:{pct:number;color:string;label:string}){return(<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><div style={{width:52,fontSize:11,color:'#6b7280',textAlign:'right',flexShrink:0}}>{label}</div><div style={{flex:1,background:'#f3f4f6',borderRadius:4,height:7}}><div style={{width:`${pct}%`,background:color,height:'100%',borderRadius:4}}/></div><div style={{width:28,fontSize:11,fontWeight:600}}>{pct}%</div></div>);}
-function Audience({ch}:{ch:Ch}){const p=useMemo(()=>est(ch.keyword||'',ch.countryCode),[ch.channelId]);const b:React.CSSProperties={flex:1,minWidth:155,background:'#f9fafb',borderRadius:10,padding:'11px 13px',border:'1px solid #e5e7eb'};const t:React.CSSProperties={fontSize:10,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:8};return(<div style={{marginTop:10,padding:'13px 15px',background:'rgba(245,243,255,0.6)',borderRadius:10,border:'1px solid #e9d5ff'}}><div style={{fontSize:11,color:'#9ca3af',marginBottom:8}}>📊 受众画像估算（基于关键词与地区）</div><div style={{display:'flex',gap:9,flexWrap:'wrap'}}><div style={{...b,minWidth:150,maxWidth:190}}><div style={t}>👥 性别</div><div style={{display:'flex',borderRadius:8,overflow:'hidden',height:21,marginBottom:7}}><div style={{width:`${p.m}%`,background:'#3b82f6',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'white',fontWeight:600}}>♂{p.m}%</div><div style={{flex:1,background:'#ec4899',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'white',fontWeight:600}}>♀{p.f}%</div></div></div><div style={{...b,flex:2,minWidth:185}}><div style={t}>🎂 年龄</div>{p.age.map((a,i)=><Bar key={a.l} label={a.l} pct={a.p} color={['#a78bfa','#8b5cf6','#7c3aed','#6d28d9','#5b21b6','#4c1d95'][i]}/>)}</div><div style={{...b,flex:1.5,minWidth:155}}><div style={t}>💰 收入</div>{p.inc.map((inc:any,i:number)=><Bar key={inc.l} label={inc.l} pct={inc.p} color={['#10b981','#3b82f6','#f59e0b','#ef4444'][i]}/>)}</div><div style={{...b,minWidth:150}}><div style={t}>🌍 受众国家</div>{p.countries.slice(0,5).map(c=><div key={c.name} style={{display:'flex',alignItems:'center',gap:7,marginBottom:4}}><span style={{fontSize:13}}>{c.flag}</span><div style={{flex:1,background:'#f3f4f6',borderRadius:4,height:7}}><div style={{width:`${c.pct*2}%`,background:'#7c3aed',height:'100%',borderRadius:4}}/></div><span style={{fontSize:11,fontWeight:600,width:28}}>{c.pct}%</span></div>)}</div></div></div>);}
+function Audience({ch}:{ch:Ch}){
+  const topics=ch.topics||[];
+  const kws=ch.channelKeywords||[];
+  const lang=ch.defaultLanguage;
+  const erQ=ch.engagementRate>5?'极高':ch.engagementRate>3?'高':ch.engagementRate>1?'中等':'低';
+  const erColor=ch.engagementRate>5?'#059669':ch.engagementRate>3?'#2563eb':ch.engagementRate>1?'#d97706':'#dc2626';
+  const freqQ=ch.videoCount>0?Math.round(ch.videoCount/36):0;
+  const b:React.CSSProperties={flex:1,minWidth:160,background:'#f9fafb',borderRadius:10,padding:'11px 13px',border:'1px solid #e5e7eb'};
+  const t:React.CSSProperties={fontSize:10,fontWeight:700,color:'#6b7280',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:8};
+  return(<div style={{marginTop:10,padding:'13px 15px',background:'rgba(245,243,255,0.6)',borderRadius:10,border:'1px solid #e9d5ff'}}>
+    <div style={{fontSize:11,color:'#7c3aed',marginBottom:10,fontWeight:600}}>📊 频道真实数据（来源：YouTube API）</div>
+    <div style={{display:'flex',gap:9,flexWrap:'wrap'}}>
+      {topics.length>0&&<div style={{...b,flex:2,minWidth:200}}>
+        <div style={t}>🎯 YouTube 官方内容分类</div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+          {topics.map((tp:string)=><span key={tp} style={{padding:'3px 9px',borderRadius:20,background:'#ede9fe',color:'#5b21b6',fontSize:11,fontWeight:600}}>{tp}</span>)}
+        </div>
+      </div>}
+      {kws.length>0&&<div style={{...b,flex:2,minWidth:200}}>
+        <div style={t}>🏷 频道自填关键词</div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+          {kws.slice(0,10).map((k:string)=><span key={k} style={{padding:'2px 8px',borderRadius:20,background:'#f0fdf4',color:'#15803d',fontSize:11}}>{k}</span>)}
+        </div>
+      </div>}
+      <div style={{...b,minWidth:155}}>
+        <div style={t}>📈 互动质量</div>
+        <div style={{marginBottom:6}}><span style={{fontSize:20,fontWeight:800,color:erColor}}>{ch.engagementRate}%</span><span style={{fontSize:11,color:'#6b7280',marginLeft:5}}>{erQ}互动率</span></div>
+        <div style={{fontSize:11,color:'#6b7280'}}>均播放 <strong>{ch.avgViewsPerVideo>=1000?(ch.avgViewsPerVideo/1000).toFixed(1)+'K':ch.avgViewsPerVideo}</strong></div>
+        <div style={{fontSize:11,color:'#6b7280',marginTop:3}}>更新频率约 <strong>{freqQ}</strong> 次/月</div>
+        {lang&&<div style={{fontSize:11,color:'#6b7280',marginTop:3}}>主要语言 <strong>{lang.toUpperCase()}</strong></div>}
+      </div>
+      {topics.length===0&&kws.length===0&&<div style={{...b,flex:2}}>
+        <div style={{fontSize:12,color:'#9ca3af',lineHeight:1.6}}>
+          ⓘ 该频道未设置 YouTube 主题分类或关键词。<br/>
+          <span style={{fontSize:11}}>性别/年龄/收入数据 YouTube 不对第三方开放，仅频道主自己可见。</span>
+        </div>
+      </div>}
+    </div>
+  </div>);}
 function fmt(n:number){return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n);}
 function Pill({opts,val,set}:{opts:string[];val:string;set:(v:string)=>void}){return<div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{opts.map(o=><button key={o} onClick={()=>set(o)} style={{padding:'5px 13px',borderRadius:20,fontSize:12,fontWeight:500,cursor:'pointer',border:val===o?'1.5px solid #7c3aed':'1px solid #e2e8f0',background:val===o?'#7c3aed':'white',color:val===o?'white':'#374151'}}>{o}</button>)}</div>;}
 function Sel({opts,val,set}:{opts:string[];val:string;set:(v:string)=>void}){return<select value={val} onChange={e=>set(e.target.value)} style={{padding:'6px 24px 6px 11px',borderRadius:20,border:'1px solid #e2e8f0',fontSize:12,cursor:'pointer',background:'white',appearance:'none',backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E")`,backgroundRepeat:'no-repeat',backgroundPosition:'right 8px center'}}>{opts.map(o=><option key={o} value={o}>{o}</option>)}</select>;}
