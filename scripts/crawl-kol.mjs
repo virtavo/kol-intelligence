@@ -77,7 +77,7 @@ async function getChannelDetails(ids) {
   const result = [];
   for (let i = 0; i < ids.length; i += 50) {
     const batch = ids.slice(i, i + 50);
-    const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,brandingSettings&id=${batch.join(',')}&key=${YT_KEY}`;
+    const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,brandingSettings,topicDetails&id=${batch.join(',')}&key=${YT_KEY}`;
     const data = await (await fetch(url)).json();
     if (!data.error) result.push(...(data.items || []));
     await sleep(300);
@@ -107,6 +107,11 @@ function toKOL(ch, code, keyword = '') {
     engagementRate: sub > 0 ? Math.round(avg / sub * 1000) / 10 : 0,
     uploadFrequencyPerMonth: Math.round(vid / 36 * 10) / 10,
     businessEmail: extractEmail(ch),
+    topics: (ch.topicDetails?.topicCategories || []).map(u => {
+      try { return decodeURIComponent(u.split('/').pop() || '').replace(/_/g, ' '); } catch { return u.split('/').pop() || ''; }
+    }).filter(t => t && t.length > 1),
+    channelKeywords: (ch.brandingSettings?.channel?.keywords || '').match(/(?:[^\s"]+|"[^"]*")+/g)?.map(k => k.replace(/^"|"$/g, '')).filter(k => k.length > 1).slice(0, 12) || [],
+    defaultLanguage: ch.snippet?.defaultLanguage || '',
     keyword,
     status: 'new', notes: '', starred: false,
     crawledAt: new Date().toISOString(),
